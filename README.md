@@ -1,5 +1,4 @@
 # seasar-demo
-seasar demo
 
 Gitを使って学ぶ検証リポジトリ。
 
