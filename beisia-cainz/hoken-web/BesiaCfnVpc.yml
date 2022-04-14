@@ -1,0 +1,256 @@
+AWSTemplateFormatVersion: 2010-09-09 
+Description: Beisia-Cainz-Hoken-Web-System
+ #=================================
+ # Input Parameters
+ #=================================   
+ # SystemName
+ # Tag(SystemName-vpc,SystemName-subnet)
+Parameters:
+  SystemName:
+    Description: Input a SystemName. This Parameter will be a Name tag.
+    Type: String
+# AZ-1
+  AZ1:
+    Description: Input a AZ where Subnet 1 created.
+    Type: AWS::EC2::AvailabilityZone::Name
+# AZ-2
+  AZ2:
+    Description: Input a AZ where Subnet 2 created.
+    Type: AWS::EC2::AvailabilityZone::Name
+# VPC
+  VpcCIDR:
+    Description: Input a VPC IPv4 CidrBlock.
+    Type: String
+# Public Subnet 1
+  PublicSubnet1CidrBlock:
+    Description: Input a Public Subnet 1 IPv4 CidrBlock.   
+    Type: String
+# Public Subnet 2
+  PublicSubnet2CidrBlock:
+    Description: Input a Public Subnet 2 IPv4 CidrBlock.   
+    Type: String
+# Private Subnet 1
+  PrivateSubnet1CidrBlock:
+    Description: Input a Private Subnet 1 IPv4 CidrBlock.   
+    Type: String
+# Private Subnet 2
+  PrivateSubnet2CidrBlock:
+    Description: Input a Private Subnet 2 IPv4 CidrBlock.   
+    Type: String
+ #=================================
+ # VPCの作成
+ #=================================  
+Resources:
+  MyVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsHostnames: true # DNSホスト名取得の有効/無効。EC2にパブリックDNSを持たせる
+      EnableDnsSupport: true # VPCに対してDNS解決がサポートされているかどうか
+      InstanceTenancy: default # VPC内に起動されるインスタンスの許可されているテナンシー
+      Tags:
+        - Key: Name
+          Value: !Sub "vpc-${SystemName}"
+ #=================================
+ # Public Subnetの作成
+ #================================= 
+ # Public Subnet 1
+  MyPublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Ref AZ1
+      CidrBlock: !Ref PublicSubnet1CidrBlock
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref MyVPC
+      Tags:
+        - Key: Name
+          Value: !Sub "subnet-${SystemName}-public-a"
+ # Public Subnet 2
+  MyPublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Ref AZ2
+      CidrBlock: !Ref PublicSubnet2CidrBlock
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref MyVPC
+      Tags:
+        - Key: Name
+          Value: !Sub "subnet-${SystemName}-public-c"
+ #=================================
+ # Private Subnetの作成
+ #================================= 
+ # Private Subnet 1
+  MyPrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Ref AZ1
+      CidrBlock: !Ref PrivateSubnet1CidrBlock
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref MyVPC
+      Tags:
+        - Key: Name
+          Value: !Sub "subnet-${SystemName}-private-a"
+ # Private Subnet 2
+  MyPrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Ref AZ2
+      CidrBlock: !Ref PrivateSubnet2CidrBlock
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref MyVPC
+      Tags:
+        - Key: Name
+          Value: !Sub "subnet-${SystemName}-private-c"
+ #=================================
+ # InternetGatewayの作成
+ #=================================
+  MyInternetGW:
+    Type: AWS::EC2::InternetGateway
+    Properties: 
+      Tags: 
+        - Key: Name
+          Value: !Sub "igw-${SystemName}"
+ #=================================
+ # InternetGatewayとVPCの関連付け
+ #=================================
+  MyVPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref MyInternetGW
+      VpcId: !Ref MyVPC
+ #=================================
+ # RouteTableの作成
+ #================================= 
+ # Public Subnet 1
+  MyPublicRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref MyVPC 
+      Tags: 
+        - Key: Name
+          Value: !Sub "rtb-${SystemName}-public"
+ # Private Subnet 1
+  MyPrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref MyVPC
+      Tags: 
+        - Key: Name
+          Value: !Sub "rtb-${SystemName}-private"
+ #=================================
+ # ルーティングの定義
+ #================================= 
+  # Public
+  MyPublicRoute1:
+    Type: AWS::EC2::Route
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref MyInternetGW
+      RouteTableId: !Ref MyPublicRouteTable1
+  # Private
+  MyPrivateRoute1:
+    Type: AWS::EC2::Route
+    Properties: 
+      RouteTableId: !Ref MyPrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref MyNatGateway
+ #=================================
+ # RouteTableとSubnetを関連付け
+ #=================================       
+ # Public
+  MyPublicSubnetRouteTable1Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref MyPublicRouteTable1
+      SubnetId: !Ref MyPublicSubnet1
+  MyPublicSubnetRouteTable2Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref MyPublicRouteTable1
+      SubnetId: !Ref MyPublicSubnet2
+  # Private
+  MyPrivateSubnetRouteTable1Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref MyPrivateRouteTable1
+      SubnetId: !Ref MyPrivateSubnet1
+  MyPrivateSubnetRouteTable2Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref MyPrivateRouteTable1
+      SubnetId: !Ref MyPrivateSubnet2
+ #=================================
+ # NAT Gateway用のElastic IP設定
+ #================================= 
+  MyNatGatewayEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "eip-${SystemName}"
+ #=================================
+ # NAT Gatewayの作成
+ #================================= 
+  MyNatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - MyNatGatewayEIP
+          - AllocationId
+      SubnetId: !Ref MyPrivateSubnet1
+      Tags:
+        - Key: Name
+          Value: !Sub "ngw-${SystemName}-a"
+        - Key: Application
+          Value: !Sub "${SystemName}"
+Outputs:
+  Vpc:
+    Value: !Ref MyVPC
+    Export: 
+      Name: Vpc-Id
+  VpcCIDR:
+    Value: !Ref VpcCIDR
+    Export:
+      Name: !Sub Vpc-Cidr
+  PublicSubnetAZ1:
+    Value: !Ref MyPublicSubnet1
+    Export:
+      Name: Public-Subnet-AZ1
+  PublicSubnetAZ1Cidr:
+    Value: !Ref PublicSubnet1CidrBlock
+    Export:
+      Name: !Sub Public-Subnet-AZ1-Cidr
+  PublicSubnet2:
+    Value: !Ref MyPublicSubnet2
+    Export:
+      Name: Public-Subnet-AZ2
+  PublicSubnetAZ2Cidr:
+    Value: !Ref PublicSubnet2CidrBlock
+    Export:
+      Name: !Sub Public-Subnet-AZ2-Cidr
+  PrivateSubnetAZ1:
+    Value: !Ref MyPrivateSubnet1
+    Export:
+      Name: Private-Subnet-AZ1
+  PrivateSubnetAZ1Cidr:
+    Value: !Ref PrivateSubnet1CidrBlock
+    Export:
+      Name: !Sub Private-Subnet-AZ1-Cidr
+  PrivateSubnetAZ2:
+    Value: !Ref MyPrivateSubnet2
+    Export:
+      Name: Private-Subnet-AZ2
+  PrivateSubnetAZ2Cidr:
+    Value: !Ref PrivateSubnet2CidrBlock
+    Export:
+      Name: !Sub Private-Subnet-AZ2-Cidr
+  InternetGW:
+    Value: !Ref MyInternetGW
+    Export: 
+      Name: InternetGateway-Id
+  NatGateway:
+    Value: !Ref MyNatGateway
+    Export: 
+      Name: NatGateway-Id
